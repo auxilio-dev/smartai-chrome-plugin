@@ -55,10 +55,14 @@ function updateAbcdState(payload) {
 		abcdState[category] = {};
 	}
 
-	abcdState[category][key] = {
-		text: value,
-		timestamp: nowAmsterdamISO(),
-	};
+	if (value === "deselected") {
+		delete abcdState[category][key];
+	} else {
+		abcdState[category][key] = {
+			text: value,
+			timestamp: nowAmsterdamISO(),
+		};
+	}
 
 	abcdState.meta.updated_at = nowAmsterdamISO();
 }
@@ -174,40 +178,32 @@ function handleInteraction(event) {
 		}
 	}
 
-	// --- B. COMPLAINT CLICKS ---
-	const complaintLabel = target.closest("label.omschrijving");
-	const complaintCheckbox = target.closest("input.ingangsklacht-selectbox");
-
-	if (complaintLabel || complaintCheckbox) {
-		let labelText = "";
-		if (complaintLabel) {
-			labelText = complaintLabel.textContent.trim();
-		} else if (complaintCheckbox) {
-			const id = complaintCheckbox.id;
-			const label = document.querySelector(`label[for="${id}"]`);
-			labelText = label ? label.textContent.trim() : "unknown";
-		}
-
-		if (labelText) {
-			window.top.postMessage(
-				{
-					type: "TRACK_CLICK",
-					payload: {
-						category: "ingangsklachten",
-						label: labelText,
-						value: "selected",
-					},
-				},
-				"*"
-			);
-		}
-	}
 }
 
 document.addEventListener("click", handleInteraction, {
 	capture: true,
 	passive: true,
 });
+
+document.addEventListener("change", (event) => {
+	const checkbox = event.target.closest("input.ingangsklacht-selectbox");
+	if (!checkbox) return;
+
+	const label = document.querySelector(`label[for="${checkbox.id}"]`);
+	const labelText = label ? label.textContent.trim() : "unknown";
+
+	window.top.postMessage(
+		{
+			type: "TRACK_CLICK",
+			payload: {
+				category: "ingangsklachten",
+				label: labelText,
+				value: checkbox.checked ? "selected" : "deselected",
+			},
+		},
+		"*"
+	);
+}, { capture: true });
 
 // --- 7. TOP FRAME INITIALIZATION ---
 
