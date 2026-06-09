@@ -1,3 +1,2 @@
-const GP_CONFIG = {
-    name: "Medrie",
-};
+// GP practice name is derived from the URL hostname (first subdomain segment).
+const GP_CONFIG = {};

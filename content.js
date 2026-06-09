@@ -70,7 +70,7 @@ function updateAbcdState(payload) {
 function buildAggregatedJson() {
 	return {
 		topicus_id: TOPICUS_ID,
-		gp_name: GP_CONFIG.name,
+		gp_name: window.location.hostname.split(".")[0],
 		abcd: abcdState,
 	};
 }
