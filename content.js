@@ -34,6 +34,15 @@ function normalizeKey(label) {
 	);
 }
 
+function isTrustedOrigin(origin) {
+	try {
+		const { protocol, hostname } = new URL(origin);
+		return protocol === "https:" && /(^|\.)topicus-hap\.nl$/.test(hostname);
+	} catch {
+		return false;
+	}
+}
+
 function nowAmsterdamISO() {
 	return new Intl.DateTimeFormat("sv-SE", {
 		timeZone: "Europe/Amsterdam",
@@ -280,6 +289,8 @@ if (IS_TOP) {
 	TOPICUS_ID = urlParts.pop();
 
 	window.addEventListener("message", (event) => {
+		if (!isTrustedOrigin(event.origin)) return;
+
 		const data = event.data;
 		if (!data) return;
 
@@ -314,7 +325,8 @@ if (IS_TOP) {
 		document.body.appendChild(panel);
 
 		window.addEventListener("message", (e) => {
-			if (e.data.type === "TRACK_CLICK") {
+			if (!isTrustedOrigin(e.origin)) return;
+			if (e.data?.type === "TRACK_CLICK") {
 				const log = document.getElementById("log");
 				if (log) log.innerText = `Last: ${e.data.payload.label}`;
 			}
