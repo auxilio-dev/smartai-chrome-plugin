@@ -11,6 +11,9 @@ let abcdState = {
 	meta: {
 		started_at: nowAmsterdamISO(),
 		updated_at: null,
+		urgency_score: null,
+		altered_urgency_score: null,
+		altered_urgency_reason: null,
 	},
 	abcd: {},
 	ingangsklachten: {},
@@ -62,6 +65,18 @@ function updateAbcdState(payload) {
 			text: value,
 			timestamp: nowAmsterdamISO(),
 		};
+	}
+
+	abcdState.meta.updated_at = nowAmsterdamISO();
+}
+
+function updateUrgencyState(payload) {
+	const { value, manual } = payload;
+
+	if (manual) {
+		abcdState.meta.altered_urgency_score = value;
+	} else {
+		abcdState.meta.urgency_score = value;
 	}
 
 	abcdState.meta.updated_at = nowAmsterdamISO();
@@ -205,7 +220,60 @@ document.addEventListener("change", (event) => {
 	);
 }, { capture: true });
 
-// --- 7. TOP FRAME INITIALIZATION ---
+// --- 7. URGENCY LISTENER (AUTO-SET + MANUAL OVERRIDE) ---
+
+let lastUrgentieValue = null;
+
+function getUrgentieValue(link) {
+	const text = link?.querySelector(".number")?.textContent.trim();
+	return text || null;
+}
+
+function reportUrgentie(value, manual) {
+	if (value == null) return;
+	window.top.postMessage(
+		{ type: "TRACK_URGENCY", payload: { value, manual } },
+		"*"
+	);
+}
+
+function checkUrgentieSelection() {
+	const selected = document.querySelector(".urgentie-panel .urgentie.selected");
+	const value = getUrgentieValue(selected);
+	if (value !== null && value !== lastUrgentieValue) {
+		lastUrgentieValue = value;
+		reportUrgentie(value, false);
+	}
+}
+
+if (document.body) {
+	checkUrgentieSelection();
+
+	const urgentieWatcher = new MutationObserver(() => checkUrgentieSelection());
+	urgentieWatcher.observe(document.body, {
+		childList: true,
+		subtree: true,
+		attributes: true,
+		attributeFilter: ["class"],
+	});
+
+	// A click on an enabled (non-disabled) urgency link is a manual override.
+	document.addEventListener(
+		"click",
+		(event) => {
+			const link = event.target.closest(".urgentie-panel a.urgentie");
+			if (!link || link.classList.contains("disabled")) return;
+			const value = getUrgentieValue(link);
+			// Pre-mark this value as "seen" so the DOM update the click triggers
+			// isn't also reported as an automatic change by the MutationObserver.
+			lastUrgentieValue = value;
+			reportUrgentie(value, true);
+		},
+		{ capture: true }
+	);
+}
+
+// --- 8. TOP FRAME INITIALIZATION ---
 
 if (IS_TOP) {
 	const urlParts = window.location.pathname.split("/").filter(Boolean);
@@ -213,10 +281,15 @@ if (IS_TOP) {
 
 	window.addEventListener("message", (event) => {
 		const data = event.data;
-		if (!data || data.type !== "TRACK_CLICK") return;
+		if (!data) return;
 
-		updateAbcdState(data.payload);
-		callWebhook(buildAggregatedJson());
+		if (data.type === "TRACK_CLICK") {
+			updateAbcdState(data.payload);
+			callWebhook(buildAggregatedJson());
+		} else if (data.type === "TRACK_URGENCY") {
+			updateUrgencyState(data.payload);
+			callWebhook(buildAggregatedJson());
+		}
 	});
 
 	(function createSidePanel() {
